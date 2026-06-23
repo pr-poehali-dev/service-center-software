@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import Icon from '@/components/ui/icon';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { toast } from '@/hooks/use-toast';
 
 const NAV = [
   { id: 'home', label: 'Главная', icon: 'LayoutDashboard' },
@@ -27,12 +32,29 @@ const MASTERS = [
   { name: 'Сергей Белов', skill: 'Мелкая техника', load: 20, status: 'Свободен', orders: 1 },
 ];
 
-const ORDERS = [
+const INITIAL_ORDERS = [
   { id: 'SC-2041', device: 'Холодильник Bosch', issue: 'Не морозит камеру', master: 'Алексей Громов', status: 'В работе', auto: true },
   { id: 'SC-2042', device: 'Стиралка LG', issue: 'Не сливает воду', master: 'Ирина Соколова', status: 'Диагностика', auto: true },
   { id: 'SC-2043', device: 'Телевизор Samsung', issue: 'Нет изображения', master: 'Дмитрий Орлов', status: 'Ожидает', auto: false },
   { id: 'SC-2044', device: 'Микроволновка', issue: 'Не греет', master: 'Авто-подбор...', status: 'Новая', auto: true },
 ];
+
+const DEVICE_TYPES = [
+  { id: 'fridge', label: 'Холодильник', keywords: ['Холодильник'] },
+  { id: 'washer', label: 'Стиральная машина', keywords: ['Стиральные', 'машины'] },
+  { id: 'tv', label: 'Телевизор / Электроника', keywords: ['ТВ', 'Электроника'] },
+  { id: 'small', label: 'Мелкая техника', keywords: ['Мелкая'] },
+];
+
+function pickMaster(deviceTypeId: string) {
+  const type = DEVICE_TYPES.find((d) => d.id === deviceTypeId);
+  if (!type) return null;
+  const matched = MASTERS.filter((m) =>
+    type.keywords.some((k) => m.skill.includes(k)),
+  );
+  const pool = matched.length ? matched : MASTERS;
+  return [...pool].sort((a, b) => a.load - b.load)[0];
+}
 
 const statusColor: Record<string, string> = {
   'В работе': 'bg-primary/15 text-primary border-primary/30',
@@ -43,6 +65,33 @@ const statusColor: Record<string, string> = {
 
 const Index = () => {
   const [active, setActive] = useState('home');
+  const [orders, setOrders] = useState(INITIAL_ORDERS);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ device: '', issue: '', type: '' });
+  const suggested = form.type ? pickMaster(form.type) : null;
+
+  const handleSubmit = () => {
+    if (!form.device || !form.type) {
+      toast({ title: 'Заполните технику и тип', variant: 'destructive' });
+      return;
+    }
+    const master = pickMaster(form.type);
+    const newOrder = {
+      id: `SC-${2045 + orders.length - INITIAL_ORDERS.length}`,
+      device: form.device,
+      issue: form.issue || 'Без описания',
+      master: master ? master.name : 'Авто-подбор…',
+      status: 'Новая',
+      auto: true,
+    };
+    setOrders([newOrder, ...orders]);
+    setOpen(false);
+    setForm({ device: '', issue: '', type: '' });
+    toast({
+      title: 'Заявка создана',
+      description: master ? `Назначен мастер: ${master.name}` : 'Мастер будет подобран',
+    });
+  };
 
   return (
     <div className="min-h-screen flex bg-background text-foreground relative overflow-hidden">
@@ -101,7 +150,7 @@ const Index = () => {
               <Icon name="Search" size={16} />
               Поиск заявки…
             </div>
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold glow-cyan">
+            <Button onClick={() => setOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold glow-cyan">
               <Icon name="Plus" size={18} className="mr-1" /> Новая заявка
             </Button>
           </div>
@@ -157,7 +206,7 @@ const Index = () => {
                 <button className="text-xs text-primary hover:underline">Все заявки →</button>
               </div>
               <div className="space-y-3">
-                {ORDERS.map((o) => (
+                {orders.map((o) => (
                   <div
                     key={o.id}
                     className="flex items-center gap-4 p-3 rounded-xl bg-secondary/40 border border-border hover:border-primary/30 transition-colors"
@@ -209,6 +258,72 @@ const Index = () => {
           </div>
         </div>
       </main>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="glass border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl font-600 tracking-wide flex items-center gap-2">
+              <Icon name="Plus" size={20} className="text-primary" /> Новая заявка
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Техника</Label>
+              <Input
+                placeholder="Напр. Холодильник Bosch KGN"
+                value={form.device}
+                onChange={(e) => setForm({ ...form, device: e.target.value })}
+                className="bg-secondary/40 border-border"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Тип техники</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {DEVICE_TYPES.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setForm({ ...form, type: t.id })}
+                    className={`px-3 py-2.5 rounded-lg text-xs font-medium border transition-all ${
+                      form.type === t.id
+                        ? 'bg-primary/10 text-primary border-primary/40'
+                        : 'bg-secondary/40 text-muted-foreground border-border hover:text-foreground'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Описание поломки</Label>
+              <Textarea
+                placeholder="Что случилось с техникой?"
+                value={form.issue}
+                onChange={(e) => setForm({ ...form, issue: e.target.value })}
+                className="bg-secondary/40 border-border resize-none"
+                rows={2}
+              />
+            </div>
+
+            {suggested && (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/30 animate-fade-in">
+                <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+                  <Icon name="Sparkles" size={16} className="text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-[0.15em] text-primary">AI подбор мастера</div>
+                  <div className="text-sm font-medium truncate">{suggested.name}</div>
+                  <div className="text-[11px] text-muted-foreground truncate">{suggested.skill} · загрузка {suggested.load}%</div>
+                </div>
+              </div>
+            )}
+
+            <Button onClick={handleSubmit} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold glow-cyan">
+              <Icon name="Check" size={18} className="mr-1" /> Создать заявку
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
