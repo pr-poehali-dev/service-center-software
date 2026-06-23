@@ -6,6 +6,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
+import { User, logout } from '@/lib/auth';
+import Masters from './Masters';
+
+interface Props { user: User; onLogout: () => void; }
 
 const NAV = [
   { id: 'home', label: 'Главная', icon: 'LayoutDashboard' },
@@ -63,12 +67,17 @@ const statusColor: Record<string, string> = {
   'Новая': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
 };
 
-const Index = () => {
+const Index = ({ user, onLogout }: Props) => {
   const [active, setActive] = useState('home');
   const [orders, setOrders] = useState(INITIAL_ORDERS);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ device: '', issue: '', type: '' });
   const suggested = form.type ? pickMaster(form.type) : null;
+
+  const handleLogout = async () => {
+    await logout();
+    onLogout();
+  };
 
   const handleSubmit = () => {
     if (!form.device || !form.type) {
@@ -126,14 +135,24 @@ const Index = () => {
             </button>
           ))}
         </nav>
-        <div className="p-4 border-t border-border">
+        <div className="p-4 border-t border-border space-y-3">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center text-accent font-semibold">А</div>
-            <div className="text-sm">
-              <div className="font-medium leading-none">Администратор</div>
-              <div className="text-xs text-muted-foreground mt-1">Онлайн</div>
+            <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center text-accent font-semibold shrink-0">
+              {user.name[0]}
+            </div>
+            <div className="text-sm min-w-0">
+              <div className="font-medium leading-none truncate">{user.name}</div>
+              <div className="text-xs text-muted-foreground mt-1">
+                {user.role === 'admin' ? 'Администратор' : 'Мастер'}
+              </div>
             </div>
           </div>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 border border-transparent hover:border-destructive/20 transition-all"
+          >
+            <Icon name="LogOut" size={14} /> Выйти из системы
+          </button>
         </div>
       </aside>
 
@@ -142,21 +161,29 @@ const Index = () => {
         {/* Header */}
         <header className="h-20 px-5 md:px-8 flex items-center justify-between border-b border-border glass sticky top-0 z-20">
           <div>
-            <h1 className="font-display text-2xl md:text-3xl font-600 tracking-wide">Центр управления</h1>
+            <h1 className="font-display text-2xl md:text-3xl font-600 tracking-wide">
+              {active === 'masters' ? 'Мастера' : 'Центр управления'}
+            </h1>
             <p className="text-xs text-muted-foreground hidden sm:block">Понедельник, 23 июня · Все системы в норме</p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary/60 border border-border text-sm text-muted-foreground">
-              <Icon name="Search" size={16} />
-              Поиск заявки…
-            </div>
-            <Button onClick={() => setOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold glow-cyan">
-              <Icon name="Plus" size={18} className="mr-1" /> Новая заявка
-            </Button>
+            {active === 'home' && (
+              <>
+                <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary/60 border border-border text-sm text-muted-foreground">
+                  <Icon name="Search" size={16} />
+                  Поиск заявки…
+                </div>
+                <Button onClick={() => setOpen(true)} className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold glow-cyan">
+                  <Icon name="Plus" size={18} className="mr-1" /> Новая заявка
+                </Button>
+              </>
+            )}
           </div>
         </header>
 
-        <div className="p-5 md:p-8 space-y-8">
+        {active === 'masters' && <Masters currentUser={user} />}
+
+        {active === 'home' && <div className="p-5 md:p-8 space-y-8">
           {/* Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {STATS.map((s, i) => (
@@ -256,7 +283,7 @@ const Index = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div>}
       </main>
 
       <Dialog open={open} onOpenChange={setOpen}>
